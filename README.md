@@ -1,4 +1,4 @@
-# 🚀 Agentic AI-Based AWS IAM Automation with RAG & Human-in-the-Loop Governance
+# 🚀 Agentic AI-Based AWS IAM Automation with Hybrid RAG & Human-in-the-Loop Governance
 
 An AI-powered AWS automation system that combines **Retrieval-Augmented Generation (RAG)**, **tool-integrated agents**, and **human-in-the-loop approval workflows** to safely automate AWS IAM troubleshooting and remediation actions.
 
@@ -20,7 +20,7 @@ The system is designed to simulate enterprise-grade cloud change management auto
 
 ## 🧠 Architecture
 
-User (Streamlit UI) -> LangGraph Agent -> RAG (Vector DB + Metadata Filtering) -> AWS Action Tool -> High-Impact Detection -> Interrupt -> Human Approval -> Resume Execution
+User (Streamlit UI) -> LangGraph Agent -> Hybrid RAG (Graph RAG + Traditional RAG) -> AWS Action Tool -> High-Impact Detection -> Interrupt -> Human Approval -> Resume Execution
 
 ---
 
