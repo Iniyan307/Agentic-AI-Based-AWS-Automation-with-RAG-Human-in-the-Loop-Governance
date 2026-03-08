@@ -1,3 +1,193 @@
+# from langgraph.graph import StateGraph, MessagesState, START, END
+# from langchain.messages import HumanMessage, SystemMessage
+# from langchain.messages import ToolMessage
+# from typing import Literal
+# from langchain.tools import tool
+# from google import genai
+# from dotenv import load_dotenv
+# import os
+# from awsRAG import retrival_argumented_generation
+# from langchain_google_genai import ChatGoogleGenerativeAI
+# from prompts import RAG_agent_prompt1, OPERATOR_agent_prompt1
+
+# load_dotenv()
+# GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+
+# #initialize google chat model 
+# try:
+#     model = ChatGoogleGenerativeAI(model="gemini-2.5-pro")
+# except Exception as e:
+#     raise ValueError(f"❌ Failed to initialize Gemini LLM: {e}")
+
+
+# @tool
+# def RAG(query: str) -> str:
+#     """Get similar documents from the vector store
+#     Args:
+#         query: str
+#     """
+#     docs = retrival_argumented_generation(query)
+#     return docs
+
+# @tool
+# def AWStool(service: str, configuration_item: str, action: str) -> str:
+#     """Take action based on the AWS service and configuration item
+#     Args: 
+#         service: str (AWS services like IAM, lambda, S3)
+#         configuration_item: str 
+#         action: str 
+#     """
+#     return f"Action: {action} done, for the Service: {service} with CI: {configuration_item}"
+
+# # print("Initializing tools")
+# tools = [RAG, AWStool]
+# tools_by_name = {tool.name: tool for tool in tools}
+# # model_with_tools = model.bind_tools(tools)
+# model_with_rag_tools = model.bind_tools([RAG])
+# model_with_operator_tools = model.bind_tools([AWStool])
+# # print("Tools Initialized")
+
+
+#  # ============================ Tool Node ==========================
+# def tool_node(state: dict):
+#     """Performs the tool call"""
+#     result = []
+#     for tool_call in state["messages"][-1].tool_calls:
+#         tool = tools_by_name[tool_call["name"]]
+#         observation = tool.invoke(tool_call["args"])
+#         result.append(
+#             ToolMessage(
+#                 content=observation,
+#                 tool_call_id=tool_call["id"]
+#             )
+#         )
+#     return {"messages": state["messages"] + result}
+
+# #============================= Nodes =============================
+
+
+# # Basic chat model
+# def call_model(state: MessagesState):
+#     messages = state['messages']
+#     response = model.invoke(messages)
+#     return {"messages": [response]}
+
+# def RAGplanner(state: MessagesState):
+#     state_messages = state['messages']
+#     system_prompt = SystemMessage(
+#                 content = """ You are a retrieval planner.
+#                             Rules:
+#                             - You MUST call the RAG tool for ANY troubleshooting, IAM, AWS, or error-related query.
+#                             - You are NOT allowed to call AWStool.
+#                             - You are NOT allowed to answer from memory.
+#                             - Your ONLY valid action is to call RAG(query).
+#                             If you do not call RAG, you are failing the task.
+#                     """)
+    
+#     response = model_with_rag_tools.invoke(
+#         [system_prompt] + state_messages
+#     )
+#     return {
+#         "messages": state["messages"] + [response]
+#     }
+
+# def rerank_agent(state: MessagesState):
+#     system_prompt = SystemMessage(
+#         content=RAG_agent_prompt1
+#     )
+#     response = model.invoke(
+#         [system_prompt] + state["messages"]
+#     )
+#     return {"messages": state["messages"] + [response]}
+
+# def operator_agent(state: MessagesState):
+#     system_prompt = SystemMessage(
+#         content=OPERATOR_agent_prompt1
+#     )
+#     response = model_with_operator_tools.invoke(
+#         [system_prompt] + state["messages"]
+#     )
+#     return {"messages": state["messages"] + [response]}
+
+
+
+
+# # ==================== END LOGIC ==================
+
+# def should_continue(state: MessagesState) -> Literal["tool_node", END]:
+#     """Decide if we should continue the loop or stop based upon whether the LLM made a tool call"""
+
+#     messages = state["messages"]
+#     last_message = messages[-1]
+
+#     # If the LLM makes a tool call, then perform an action
+#     if last_message.tool_calls:
+#         return "tool_node"
+
+#     # Otherwise, we stop (reply to the user)
+#     return END
+
+# def should_call_rag(state):
+#     last = state["messages"][-1]
+#     return "tool_node" if last.tool_calls else "rerank_agent"
+
+# def should_call_operator_tool(state):
+#     last = state["messages"][-1]
+#     return "tool_node" if last.tool_calls else END
+
+
+# # =================================================
+
+# graph = StateGraph(MessagesState)
+
+# graph.add_node("RAGplanner", RAGplanner)
+# graph.add_node("tool_node", tool_node)
+# graph.add_node("rerank_agent", rerank_agent)
+# graph.add_node("operator_agent", operator_agent)
+
+# graph.add_edge(START, "RAGplanner")
+
+# # RAG planning loop
+# graph.add_conditional_edges(
+#     "RAGplanner",
+#     should_call_rag,
+#     ["tool_node", "rerank_agent"]
+# )
+
+# # Tool execution returns to whoever called it
+# graph.add_edge("tool_node", "RAGplanner")
+
+# # After reranking, go to operator
+# graph.add_edge("rerank_agent", "operator_agent")
+
+# # Operator loop
+# graph.add_conditional_edges(
+#     "operator_agent",
+#     should_call_operator_tool,
+#     ["tool_node", END]
+# )
+
+# # Tool execution returns to operator
+# graph.add_edge("tool_node", "operator_agent")
+
+# agent = graph.compile()
+
+
+
+# # agent.invoke({"messages":[{"role":"user", "content": "Hello"}]})
+
+# # messages = [HumanMessage(content="Why is AssumeRole failing?")]
+# messages = [HumanMessage(content="Users are getting AccessDenied when trying to assume an IAM role from EC2. The error mentions sts:AssumeRole. How do I fix this?")]
+# # messages = [HumanMessage(content="Add 3 and 4.")]
+# messages = agent.invoke({"messages": messages})
+# for m in messages["messages"]:
+#     try: 
+#         m[0]["text"].pretty_print()
+#     except Exception as e:
+#         m.pretty_print()
+
+
+
 from langgraph.graph import StateGraph, MessagesState, START, END
 from langchain.messages import HumanMessage, SystemMessage, ToolMessage
 from langgraph.checkpoint.memory import MemorySaver
@@ -6,24 +196,42 @@ from langchain.tools import tool
 from dotenv import load_dotenv
 import os
 from awsRAG import retrival_argumented_generation
+from GraphRAGretrival import graph_rag_retrieve
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_ollama import ChatOllama
 from prompts import RAG_planner_prompt1, RAG_agent_prompt1, OPERATOR_agent_prompt1, FINAL_reponse_prompt1
 from langgraph.types import Command, interrupt
+from langchain_groq import ChatGroq
 
 load_dotenv()
 
+from pydantic import BaseModel
+
+class AWSToolInput(BaseModel):
+    service: str
+    configuration_item: str
+    action: str
+    reversible: bool
+    highImpact: bool
 
 
 # ================= MODEL =================
 try:
     # model = ChatGoogleGenerativeAI(model="gemini-2.0-flash")
 # gemini-2.5-flash-lite, gemini-2.5-flash, gemini-2.5-pro , gemini-3-flash, gemini-2.0-flash
-    model = ChatOllama(model="qwen2.5:7b", temperature=0)
+    # model = ChatOllama(model="qwen2.5:7b", temperature=0)
     # qwen2.5:3b, qwen2.5:7b, llama3.2:3b
 
+    model = ChatGroq(
+        # model="llama-3.3-70b-versatile",
+        # model = "llama-3.1-8b-instant",
+        model = "qwen/qwen3-32b",
+        temperature=0,
+        api_key=os.getenv("GROQ_API_KEY")
+    )
+
 except Exception as e:
-    raise ValueError(f"❌ Failed to initialize Gemini LLM: {e}")
+    raise ValueError(f"❌ Failed to initialize LLM: {e}")
 
 # ================= TOOLS =================
 
@@ -35,16 +243,22 @@ def RAG(query: str) -> str:
             query: str
     """
     docs = retrival_argumented_generation(query)
+    graph_docs = graph_rag_retrieve(query)
 
     # Ensure output is always plain string
     if isinstance(docs, list):
         if isinstance(docs[0], dict) and "text" in docs[0]:
             return "\n".join(d["text"] for d in docs)
         return "\n".join(str(d) for d in docs)
+    
+    if isinstance(graph_docs, list):
+        if isinstance(graph_docs[0], dict) and "text" in graph_docs[0]:
+            return "\n".join(d["text"] for d in graph_docs)
+        return "\n".join(str(d) for d in graph_docs)
 
-    return str(docs)
+    return str(docs)+str(graph_docs)
 
-@tool
+@tool(args_schema=AWSToolInput)
 def AWSTool(service: str, configuration_item: str, action: str, reversible: bool, highImpact: bool ) -> str:
     """
         Take action based on the AWS service and configuration item
@@ -52,8 +266,8 @@ def AWSTool(service: str, configuration_item: str, action: str, reversible: bool
             service: str (AWS services like IAM, lambda, S3)
             configuration_item: str 
             action: str 
-            Reversible: bool 
-            HighImpact: bool 
+            Reversible: boolean 
+            HighImpact: boolean 
     """
     print("Reversible, HighImpact: ", reversible, highImpact)
 
@@ -112,16 +326,40 @@ def rag_tool_node(state: MessagesState):
 
     return {"messages": state["messages"] + results}
 
+# def operator_tool_node(state: MessagesState):
+#     last = state["messages"][-1]
+#     results = []
+
+#     for tool_call in last.tool_calls:
+#         tool = tools_by_name[tool_call["name"]]
+#         observation = tool.invoke(tool_call["args"])
+
+#         if isinstance(observation, list):
+#             observation = str(observation)
+
+#         results.append(
+#             ToolMessage(
+#                 content=str(observation),
+#                 tool_call_id=tool_call["id"]
+#             )
+#         )
+
+#     return {"messages": state["messages"] + results}
+
 def operator_tool_node(state: MessagesState):
     last = state["messages"][-1]
     results = []
 
     for tool_call in last.tool_calls:
         tool = tools_by_name[tool_call["name"]]
-        observation = tool.invoke(tool_call["args"])
+        args = tool_call["args"]
 
-        if isinstance(observation, list):
-            observation = str(observation)
+        # 🔧 Fix boolean strings
+        for key in ["reversible", "highImpact"]:
+            if key in args and isinstance(args[key], str):
+                args[key] = args[key].lower() == "true"
+
+        observation = tool.invoke(args)
 
         results.append(
             ToolMessage(
@@ -272,4 +510,3 @@ agent = get_agent()
 # Permanently delete IAM role Prod-App-Role used by production EC2 instances.
 
 # ==============================================================
-
