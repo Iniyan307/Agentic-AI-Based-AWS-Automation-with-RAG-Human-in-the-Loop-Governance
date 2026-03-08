@@ -55,6 +55,11 @@ The system uses **Hybrid Knowledge Retrieval**:
 
 This hybrid approach improves **retrieval accuracy and reasoning depth**.
 
+<img width="690" height="727" alt="Screenshot 2026-03-08 205800" src="https://github.com/user-attachments/assets/6570a470-ea2b-4d7e-8b1d-a159227997a6" />
+
+<img width="1170" height="785" alt="Screenshot 2026-03-07 173423" src="https://github.com/user-attachments/assets/c0141a5d-f7a4-4822-9dd9-ba7bbfdca3ff" />
+
+
 ---
 
 ### 🛠 AWS Action Tool Layer
